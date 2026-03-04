@@ -32,3 +32,5 @@ function hillClimb(start, maxIterations = 1000) {
 // Example usage
 const result = hillClimb(0);
 console.log(`Best solution: x = ${result.solution}, score = ${result.score}`);
+
+//modify
