@@ -26,3 +26,4 @@ function selectionSort(arr) {
     }
     return arr;
 }
+//Insert a new line in the conflict branch
