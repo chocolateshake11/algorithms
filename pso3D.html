@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSO 3D Szimulációs Vizualizáció</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 10;
+            min-width: 300px;
+            border: 2px solid #00ff00;
+        }
+        
+        .info-panel h2 {
+            margin-bottom: 10px;
+            color: #00ffff;
+            font-size: 14px;
+        }
+        
+        .info-panel p {
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+        
+        .value {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        
+        .best-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .controls-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #00ff00;
+            z-index: 10;
+        }
+        
+        .controls-panel label {
+            display: block;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+        
+        .controls-panel input[type="range"] {
+            width: 150px;
+            vertical-align: middle;
+        }
+        
+        .controls-panel button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #00ff00;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        
+        .controls-panel button:hover {
+            background: #00cccc;
+            transform: scale(1.05);
+        }
+        
+        .stats-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 10;
+            border: 2px solid #ff00ff;
+            min-width: 250px;
+        }
+        
+        .stats-panel h2 {
+            margin-bottom: 10px;
+            color: #ff00ff;
+            font-size: 14px;
+        }
+        
+        .stat-item {
+            margin: 8px 0;
+            padding: 5px;
+            background: rgba(255, 0, 255, 0.1);
+            border-left: 3px solid #ff00ff;
+            padding-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div class="info-panel">
+        <h2>🟢 PSO Algoritmus - 3D Szimuláció</h2>
+        <p>Iteráció: <span class="value" id="iteration">0</span></p>
+        <p>Legjobb érték: <span class="best-value" id="bestValue">∞</span></p>
+        <p>Legjobb pozíció: <span class="value" id="bestPosition">-</span></p>
+        <p>Aktív részecskék: <span class="value" id="particleCount">0</span></p>
+        <p>FPS: <span class="value" id="fps">0</span></p>
+        <hr style="border: 1px solid #00ff00; margin: 10px 0;">
+        <p style="font-size: 11px; color: #88ff88;">
+            <b>🎮 Kamera vezérlés:</b><br/>
+            🖱️ Drag: Forgás<br/>
+            🔄 Görgés: Zoom<br/>
+            ⌨️ WASD/Nyilak: Mozgás<br/>
+            [R] Toggle autóforgatás<br/>
+            [Szóköz] Középre
+        </p>
+    </div>
+    
+    <div class="stats-panel">
+        <h2>📊 Statisztikák</h2>
+        <div class="stat-item">
+            <p id="stat1">Átlag fitness: -</p>
+        </div>
+        <div class="stat-item">
+            <p id="stat2">Gyorsaság: -</p>
+        </div>
+        <div class="stat-item">
+            <p id="stat3">Szórás: -</p>
+        </div>
+        <div class="stat-item">
+            <p id="stat4">Konvergencia: -</p>
+        </div>
+    </div>
+    
+    <div class="controls-panel">
+        <h2 style="color: #00ff00; margin-bottom: 10px;">⚙️ Vezérlés</h2>
+        <label>
+            Sebesség (inertia):
+            <input type="range" id="inertiaSlider" min="0.1" max="0.9" step="0.1" value="0.7">
+            <span id="inertiaValue">0.7</span>
+        </label>
+        <label>
+            Kognitív (c1):
+            <input type="range" id="c1Slider" min="0" max="3" step="0.1" value="1.5">
+            <span id="c1Value">1.5</span>
+        </label>
+        <label>
+            Szociális (c2):
+            <input type="range" id="c2Slider" min="0" max="3" step="0.1" value="1.5">
+            <span id="c2Value">1.5</span>
+        </label>
+        <button id="resetBtn">Újraindítás</button>
+        <button id="pauseBtn">⏸️ Szünet</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ============ PSO 3D Szimulációs Vizualizáció ============
+        
+        class Particle {
+            constructor(bounds) {
+                this.position = new THREE.Vector3(
+                    Math.random() * bounds - bounds / 2,
+                    Math.random() * bounds - bounds / 2,
+                    Math.random() * bounds - bounds / 2
+                );
+                
+                this.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 2
+                );
+                
+                this.bestPosition = this.position.clone();
+                this.fitness = this.calculateFitness(this.position);
+                this.bestFitness = this.fitness;
+            }
+            
+            calculateFitness(position) {
+                // Rastrigin függvény 3D-ben - sok lokális optimummal
+                const A = 10;
+                const n = 3;
+                const sum = position.x ** 2 + position.y ** 2 + position.z ** 2;
+                const cos_sum = Math.cos(2 * Math.PI * position.x) + 
+                               Math.cos(2 * Math.PI * position.y) + 
+                               Math.cos(2 * Math.PI * position.z);
+                return A * n + sum - A * cos_sum;
+            }
+            
+            updateFitness() {
+                this.fitness = this.calculateFitness(this.position);
+                if (this.fitness < this.bestFitness) {
+                    this.bestFitness = this.fitness;
+                    this.bestPosition = this.position.clone();
+                }
+            }
+            
+            update(globalBest, inertia, c1, c2) {
+                // PSO sebesség frissítés
+                const r1 = Math.random();
+                const r2 = Math.random();
+                
+                const cognitive = new THREE.Vector3()
+                    .subVectors(this.bestPosition, this.position)
+                    .multiplyScalar(c1 * r1);
+                
+                const social = new THREE.Vector3()
+                    .subVectors(globalBest, this.position)
+                    .multiplyScalar(c2 * r2);
+                
+                this.velocity
+                    .multiplyScalar(inertia)
+                    .add(cognitive)
+                    .add(social);
+                
+                // Maximális sebesség korlátozás
+                const maxVelocity = 2;
+                if (this.velocity.length() > maxVelocity) {
+                    this.velocity.normalize().multiplyScalar(maxVelocity);
+                }
+                
+                // Pozíció frissítés
+                this.position.add(this.velocity);
+                
+                // Határok ellenőrzése
+                const bounds = 50;
+                this.position.x = Math.max(-bounds, Math.min(bounds, this.position.x));
+                this.position.y = Math.max(-bounds, Math.min(bounds, this.position.y));
+                this.position.z = Math.max(-bounds, Math.min(bounds, this.position.z));
+            }
+        }
+        
+        class PSO3D {
+            constructor(particleCount = 500, bounds = 100) {
+                this.particles = [];
+                this.bounds = bounds;
+                this.globalBestPosition = null;
+                this.globalBestFitness = Infinity;
+                this.iteration = 0;
+                this.inertia = 0.7;
+                this.c1 = 1.5; // kognitív
+                this.c2 = 1.5; // szociális
+                this.paused = false;
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = new Particle(bounds);
+                    this.particles.push(particle);
+                    
+                    if (particle.bestFitness < this.globalBestFitness) {
+                        this.globalBestFitness = particle.bestFitness;
+                        this.globalBestPosition = particle.bestPosition.clone();
+                    }
+                }
+            }
+            
+            step() {
+                if (this.paused) return;
+                
+                for (let particle of this.particles) {
+                    particle.update(this.globalBestPosition, this.inertia, this.c1, this.c2);
+                    particle.updateFitness();
+                    
+                    if (particle.bestFitness < this.globalBestFitness) {
+                        this.globalBestFitness = particle.bestFitness;
+                        this.globalBestPosition = particle.bestPosition.clone();
+                    }
+                }
+                
+                this.iteration++;
+            }
+            
+            getStatistics() {
+                const fitnesses = this.particles.map(p => p.fitness);
+                const avgFitness = fitnesses.reduce((a, b) => a + b, 0) / fitnesses.length;
+                const variance = fitnesses.reduce((sum, f) => sum + Math.pow(f - avgFitness, 2), 0) / fitnesses.length;
+                const stdDev = Math.sqrt(variance);
+                const avgVelocity = this.particles.reduce((sum, p) => sum + p.velocity.length(), 0) / this.particles.length;
+                
+                return { avgFitness, stdDev, avgVelocity };
+            }
+            
+            reset() {
+                this.particles = [];
+                this.globalBestPosition = null;
+                this.globalBestFitness = Infinity;
+                this.iteration = 0;
+                
+                for (let i = 0; i < 500; i++) {
+                    const particle = new Particle(this.bounds);
+                    this.particles.push(particle);
+                    
+                    if (particle.bestFitness < this.globalBestFitness) {
+                        this.globalBestFitness = particle.bestFitness;
+                        this.globalBestPosition = particle.bestPosition.clone();
+                    }
+                }
+            }
+        }
+        
+        // ============ THREE.JS Vizualizáció ============
+        
+        let scene, camera, renderer;
+        let pso;
+        let particleMeshes = [];
+        let bestParticleMesh;
+        let lastTime = Date.now();
+        let frameCount = 0;
+        let fps = 0;
+        
+        // Kamera kontroll változók
+        let cameraControl = {
+            autoRotate: true,
+            angle: 0,
+            radius: 100,
+            height: 40,
+            targetX: 0,
+            targetY: 0,
+            targetZ: 0,
+            isDragging: false,
+            previousMousePosition: { x: 0, y: 0 },
+            rotationSensitivity: 0.01,
+            zoomSensitivity: 2
+        };
+        
+        let keys = {};
+        
+        function init() {
+            const container = document.getElementById('container');
+            
+            // Scene beállítás
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+            camera.position.set(0, 0, 80);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+            
+            // Fények
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const pointLight = new THREE.PointLight(0xffffff, 0.8, 500);
+            pointLight.position.set(50, 50, 50);
+            scene.add(pointLight);
+            
+            // Tengelyek (X, Y, Z)
+            const axesLength = 60;
+            const axesHelper = new THREE.AxesHelper(axesLength);
+            scene.add(axesHelper);
+            
+            // Koordináta síkok (fél-átlátszó)
+            const planeGeometry = new THREE.PlaneGeometry(120, 120);
+            
+            // XY sík
+            const xyMaterial = new THREE.MeshStandardMaterial({ color: 0x0088ff, transparent: true, opacity: 0.1 });
+            const xyPlane = new THREE.Mesh(planeGeometry, xyMaterial);
+            xyPlane.position.z = -50;
+            scene.add(xyPlane);
+            
+            // Hazárd jelölés az origó körül
+            const boundingBoxGeometry = new THREE.BoxGeometry(100, 100, 100);
+            const boundingBoxMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+            const boundingBox = new THREE.LineSegments(
+                new THREE.EdgesGeometry(boundingBoxGeometry),
+                boundingBoxMaterial
+            );
+            scene.add(boundingBox);
+            
+            // PSO inicializálása
+            pso = new PSO3D(500, 100);
+            
+            // Részecskék hozzáadása
+            updateParticles();
+            
+            // Legjobb részecske (csillag ikon)
+            const bestGeometry = new THREE.OctahedronGeometry(2);
+            const bestMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00 });
+            bestParticleMesh = new THREE.Mesh(bestGeometry, bestMaterial);
+            scene.add(bestParticleMesh);
+            
+            // Vezérlők beállítása
+            setupControls();
+            
+            // Ablak átméretezés kezeléséhez
+            window.addEventListener('resize', onWindowResize);
+            
+            // Animáció indítása
+            animate();
+        }
+        
+        function updateParticles() {
+            // Régi részecskék eltávolítása
+            particleMeshes.forEach(mesh => scene.remove(mesh));
+            particleMeshes = [];
+            
+            // Új részecskék
+            pso.particles.forEach((particle, index) => {
+                const geometry = new THREE.SphereGeometry(1, 8, 8);
+                const material = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color().setHSL(index / pso.particles.length, 0.8, 0.5),
+                    emissive: new THREE.Color().setHSL(index / pso.particles.length, 0.8, 0.3),
+                    metalness: 0.3,
+                    roughness: 0.7
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.copy(particle.position);
+                scene.add(mesh);
+                particleMeshes.push({
+                    mesh: mesh,
+                    particle: particle
+                });
+            });
+            
+            updateBestParticle();
+        }
+        
+        function updateBestParticle() {
+            if (bestParticleMesh && pso.globalBestPosition) {
+                bestParticleMesh.position.copy(pso.globalBestPosition);
+            }
+        }
+        
+        function setupControls() {
+            document.getElementById('inertiaSlider').addEventListener('input', (e) => {
+                pso.inertia = parseFloat(e.target.value);
+                document.getElementById('inertiaValue').textContent = e.target.value;
+            });
+            
+            document.getElementById('c1Slider').addEventListener('input', (e) => {
+                pso.c1 = parseFloat(e.target.value);
+                document.getElementById('c1Value').textContent = e.target.value;
+            });
+            
+            document.getElementById('c2Slider').addEventListener('input', (e) => {
+                pso.c2 = parseFloat(e.target.value);
+                document.getElementById('c2Value').textContent = e.target.value;
+            });
+            
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                pso.reset();
+                updateParticles();
+            });
+            
+            document.getElementById('pauseBtn').addEventListener('click', (e) => {
+                pso.paused = !pso.paused;
+                e.target.textContent = pso.paused ? '▶️ Folytatás' : '⏸️ Szünet';
+            });
+            
+            // Kamera kontroll - Egér
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                cameraControl.isDragging = true;
+                cameraControl.previousMousePosition = { x: e.clientX, y: e.clientY };
+                cameraControl.autoRotate = false; // Autórotáció kikapcsolása
+            });
+            
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (cameraControl.isDragging) {
+                    const deltaX = e.clientX - cameraControl.previousMousePosition.x;
+                    const deltaY = e.clientY - cameraControl.previousMousePosition.y;
+                    
+                    cameraControl.angle += deltaX * cameraControl.rotationSensitivity;
+                    cameraControl.height += deltaY * 0.3;
+                    cameraControl.height = Math.max(-50, Math.min(150, cameraControl.height));
+                    
+                    cameraControl.previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+            });
+            
+            renderer.domElement.addEventListener('mouseup', () => {
+                cameraControl.isDragging = false;
+            });
+            
+            renderer.domElement.addEventListener('mouseleave', () => {
+                cameraControl.isDragging = false;
+            });
+            
+            // Kamera kontroll - Egér zoom (görgés)
+            renderer.domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                cameraControl.radius += e.deltaY > 0 ? cameraControl.zoomSensitivity : -cameraControl.zoomSensitivity;
+                cameraControl.radius = Math.max(20, Math.min(200, cameraControl.radius));
+            }, { passive: false });
+            
+            // Billentyűzet kontroll
+            document.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                
+                if (e.key === 'r' || e.key === 'R') {
+                    // R billentyű: Autórotáció visszakapcsolása
+                    cameraControl.autoRotate = !cameraControl.autoRotate;
+                }
+                if (e.key === ' ') {
+                    // Szóköz: Középre helyezés
+                    e.preventDefault();
+                    cameraControl.angle = 0;
+                    cameraControl.radius = 100;
+                    cameraControl.height = 40;
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+            });
+        }
+        
+        function updateCameraPosition() {
+            // Billentyűzet alapú finom mozgás
+            const moveSpeed = 2;
+            if (keys['arrowleft'] || keys['a']) cameraControl.angle -= 0.03;
+            if (keys['arrowright'] || keys['d']) cameraControl.angle += 0.03;
+            if (keys['arrowup'] || keys['w']) cameraControl.height += moveSpeed;
+            if (keys['arrowdown'] || keys['s']) cameraControl.height -= moveSpeed;
+            if (keys['+'] || keys['=']) cameraControl.radius -= moveSpeed;
+            if (keys['-']) cameraControl.radius += moveSpeed;
+            
+            // Határok
+            cameraControl.height = Math.max(-50, Math.min(150, cameraControl.height));
+            cameraControl.radius = Math.max(20, Math.min(200, cameraControl.radius));
+            
+            // Automatikus rotáció (ha engedélyezett)
+            if (cameraControl.autoRotate && !cameraControl.isDragging) {
+                cameraControl.angle += 0.002;
+            }
+            
+            // Kamera pozíció frissítése
+            camera.position.x = Math.cos(cameraControl.angle) * cameraControl.radius;
+            camera.position.z = Math.sin(cameraControl.angle) * cameraControl.radius;
+            camera.position.y = cameraControl.height;
+            camera.lookAt(cameraControl.targetX, cameraControl.targetY, cameraControl.targetZ);
+        }
+        
+        function updateUI() {
+            document.getElementById('iteration').textContent = pso.iteration;
+            document.getElementById('bestValue').textContent = pso.globalBestFitness.toFixed(4);
+            document.getElementById('particleCount').textContent = pso.particles.length;
+            document.getElementById('fps').textContent = fps;
+            
+            const pos = pso.globalBestPosition;
+            document.getElementById('bestPosition').textContent = 
+                `(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`;
+            
+            const stats = pso.getStatistics();
+            document.getElementById('stat1').textContent = `Átlag fitness: ${stats.avgFitness.toFixed(2)}`;
+            document.getElementById('stat2').textContent = `Gyorsaság: ${stats.avgVelocity.toFixed(3)}`;
+            document.getElementById('stat3').textContent = `Szórás: ${stats.stdDev.toFixed(2)}`;
+            
+            const convergence = (1 - stats.avgVelocity / 2) * 100;
+            document.getElementById('stat4').textContent = `Konvergencia: ${Math.max(0, convergence).toFixed(1)}%`;
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // PSO szimulációs lépés
+            pso.step();
+            
+            // Részecskék pozícióinak frissítése
+            particleMeshes.forEach(item => {
+                item.mesh.position.copy(item.particle.position);
+            });
+            
+            // Legjobb részecske frissítése
+            updateBestParticle();
+            
+            // Kamera pozíció frissítése
+            updateCameraPosition();
+            
+            // Render
+            renderer.render(scene, camera);
+            
+            // FPS számítása
+            frameCount++;
+            const now = Date.now();
+            if (now - lastTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastTime = now;
+            }
+            
+            // UI frissítése
+            updateUI();
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Inicializálás oldal betöltésekor
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
